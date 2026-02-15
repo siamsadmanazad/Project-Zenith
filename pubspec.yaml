@@ -1,5 +1,5 @@
 name: zenith
-description: "A new Flutter project."
+description: "The Classy Financial Calculator - Premium TVM calculations with Nordic aesthetics"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -35,6 +35,23 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # ============ ZENITH PHASE 1 DEPENDENCIES ============
+
+  # MATH ENGINE - Precise financial calculations (no rounding errors!)
+  decimal: ^3.0.1  # High-precision decimal math for money
+
+  # STATE MANAGEMENT - Manages app state cleanly
+  flutter_riverpod: ^2.6.1  # Modern state management solution
+  riverpod_annotation: ^2.6.1  # Code generation for Riverpod
+
+  # UI & DESIGN - Beautiful Nordic aesthetics
+  google_fonts: ^6.2.1  # Access to Inter, SF Pro fonts
+  flutter_animate: ^4.5.0  # Smooth animations
+
+  # UTILITIES
+  intl: ^0.20.1  # Number formatting (currency, percentages)
+  url_launcher: ^6.3.1  # Open affiliate links (Phase 3)
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -45,6 +62,10 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+
+  # CODE GENERATION - For Riverpod state management
+  build_runner: ^2.4.14  # Runs code generators
+  riverpod_generator: ^2.6.2  # Generates Riverpod providers
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
