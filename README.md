@@ -18,7 +18,7 @@
 - Step-by-Step Build Checklist (68 tasks)
 - Success Metrics & KPIs
 
-### 🏗️ [STRUCTURE.md](../STRUCTURE.md) — Implementation Guidecd 
+### 🏗️ [STRUCTURE.md](STRUCTURE.md) — Implementation Guide
 **Detailed file structure and development roadmap**
 
 - Complete directory tree with all 41 created files
@@ -75,7 +75,7 @@ Currently in **Phase 0: Project Setup — Complete ✅**
 **41 files created** across the entire project structure. Ready to begin Phase 1 implementation.
 
 - 📋 See [Build Checklist](PROJECT_ZENITH.md#15--step-by-step-build-checklist) in PROJECT_ZENITH.md for detailed roadmap
-- 🏗️ See [STRUCTURE.md](../STRUCTURE.md) for complete file structure and next steps
+- 🏗️ See [STRUCTURE.md](STRUCTURE.md) for complete file structure and next steps
 
 ---
 
@@ -95,7 +95,7 @@ Proprietary — All rights reserved.
 
 ### Core Documentation
 - **📋 [PROJECT_ZENITH.md](PROJECT_ZENITH.md)** — Complete master build plan & vision
-- **🏗️ [STRUCTURE.md](../STRUCTURE.md)** — File structure & implementation guide
+- **🏗️ [STRUCTURE.md](STRUCTURE.md)** — File structure & implementation guide
 
 ### Additional Guides (Z-Docs/)
 - **🚀 [SETUP_GUIDE.md](../Z-Docs/SETUP_GUIDE.md)** — Environment setup instructions
