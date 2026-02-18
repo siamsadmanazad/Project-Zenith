@@ -3,6 +3,20 @@ import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 
+/// Validates the full string — allows partial inputs like "-", "1.", "-0."
+class _NumberInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    if (text.isEmpty) return newValue;
+    if (RegExp(r'^-?\d*\.?\d*$').hasMatch(text)) return newValue;
+    return oldValue;
+  }
+}
+
 /// TVM Input Field - Custom text field for calculator inputs
 class TVMInputField extends StatefulWidget {
   final String label;
@@ -26,7 +40,9 @@ class TVMInputField extends StatefulWidget {
 
 class _TVMInputFieldState extends State<TVMInputField> {
   late TextEditingController _controller;
-  bool _isFocused = false;
+  late FocusNode _focusNode;
+
+  bool get _isFocused => _focusNode.hasFocus;
 
   @override
   void initState() {
@@ -34,13 +50,16 @@ class _TVMInputFieldState extends State<TVMInputField> {
     _controller = TextEditingController(
       text: widget.value?.toString() ?? '',
     );
+    _focusNode = FocusNode();
+    _focusNode.addListener(() => setState(() {}));
   }
 
   @override
   void didUpdateWidget(TVMInputField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Update controller if value changed externally (e.g., clear button)
-    if (widget.value != oldWidget.value &&
+    // Only sync from external state when NOT focused — never interrupt typing
+    if (!_focusNode.hasFocus &&
+        widget.value != oldWidget.value &&
         widget.value?.toString() != _controller.text) {
       _controller.text = widget.value?.toString() ?? '';
     }
@@ -49,6 +68,7 @@ class _TVMInputFieldState extends State<TVMInputField> {
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -88,14 +108,12 @@ class _TVMInputFieldState extends State<TVMInputField> {
           // Input field
           TextField(
             controller: _controller,
+            focusNode: _focusNode,
             keyboardType: const TextInputType.numberWithOptions(
               decimal: true,
               signed: true,
             ),
-            inputFormatters: [
-              // Allow numbers, decimal point, and minus sign
-              FilteringTextInputFormatter.allow(RegExp(r'^-?\d*\.?\d*')),
-            ],
+            inputFormatters: [_NumberInputFormatter()],
             style: theme.textTheme.headlineSmall?.copyWith(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w400,
@@ -125,15 +143,6 @@ class _TVMInputFieldState extends State<TVMInputField> {
                 final value = double.tryParse(text);
                 widget.onChanged(value);
               }
-            },
-            onTap: () {
-              setState(() => _isFocused = true);
-            },
-            onEditingComplete: () {
-              setState(() => _isFocused = false);
-            },
-            onSubmitted: (_) {
-              setState(() => _isFocused = false);
             },
           ),
         ],

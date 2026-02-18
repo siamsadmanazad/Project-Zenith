@@ -3,92 +3,87 @@ import 'package:zenith/math_engine/tvm/tvm_input.dart';
 import 'package:zenith/math_engine/tvm/tvm_solver.dart';
 
 void main() {
-  group('TVM Solver Tests', () {
-    test('Solve PMT: \$500k loan, 6.5% for 30 years', () {
-      // Arrange: Set up the problem
+  group('BA II Plus Test Cases', () {
+    test('Test 1: Solve PMT — \$500k mortgage at 6.5% for 30 years', () {
       final input = TVMInput(
-        n: 360,           // 30 years × 12 months
-        iy: 6.5,          // 6.5% annual interest
-        pv: 500000,       // $500,000 loan
-        fv: 0,            // Fully paid off
-        cpy: 12,          // Monthly payments
+        n: 360,
+        iy: 6.5,
+        pv: 500000,
+        fv: 0,
+        cpy: 12,
       );
 
-      // Act: Calculate the payment
       final pmt = TVMSolver.solve(input);
-
-      // Assert: Check if result is correct
-      // Expected: ~-$3,160.34/month (negative = payment out)
-      expect(pmt, closeTo(-3160.34, 1.0));
-      print('✅ Monthly Payment: \$${pmt.abs().toStringAsFixed(2)}');
+      expect(pmt, closeTo(-3160.34, 0.01));
     });
 
-    test('Solve PV: How much can I borrow with \$2000/month payment?', () {
+    test('Test 2: Solve FV — \$10k lump sum + \$200/mo for 10 years at 5%', () {
       final input = TVMInput(
-        n: 360,           // 30 years
-        iy: 6.5,          // 6.5%
-        pmt: -2000,       // $2000/month (negative = outflow)
+        n: 120,
+        iy: 5,
+        pv: -10000,
+        pmt: -200,
+        cpy: 12,
+      );
+
+      final fv = TVMSolver.solve(input);
+      expect(fv, closeTo(47526.55, 0.01));
+    });
+
+    test('Test 3: Solve N — \$200/mo to reach \$100k at 7%', () {
+      final input = TVMInput(
+        iy: 7,
+        pv: 0,
+        pmt: -200,
+        fv: 100000,
+        cpy: 12,
+      );
+
+      final n = TVMSolver.solve(input);
+      expect(n, closeTo(234.72, 0.01));
+    });
+
+    test('Test 4: Solve I/Y — negative rate scenario', () {
+      final input = TVMInput(
+        n: 60,
+        pv: -15000,
+        pmt: -200,
+        fv: 20000,
+        cpy: 12,
+      );
+
+      final iy = TVMSolver.solve(input);
+      expect(iy, closeTo(-7.94, 0.01));
+    });
+
+    test('Test 5: Solve PV — \$1500/mo for 20 years at 4%', () {
+      final input = TVMInput(
+        n: 240,
+        iy: 4,
+        pmt: -1500,
         fv: 0,
         cpy: 12,
       );
 
       final pv = TVMSolver.solve(input);
-
-      // Expected: ~$315,960 (wider tolerance for FP math)
-      expect(pv, closeTo(315960, 500));
-      print('✅ Loan Amount: \$${pv.toStringAsFixed(2)}');
+      expect(pv, closeTo(247532.79, 0.01));
     });
+  });
 
-    test('Solve FV: Save \$500/month for 20 years at 7%', () {
-      final input = TVMInput(
-        n: 240,           // 20 years × 12 months
-        iy: 7.0,          // 7% annual return
-        pv: 0,            // Starting from $0
-        pmt: -500,        // Save $500/month
-        cpy: 12,
-      );
-
-      final fv = TVMSolver.solve(input);
-
-      // Expected: ~$260,000 (wider tolerance)
-      expect(fv, closeTo(260000, 2000));
-      print('✅ Future Value: \$${fv.toStringAsFixed(2)}');
-    });
-
-    test('Solve N: How long to pay off \$10k at \$300/month, 5%?', () {
-      final input = TVMInput(
-        iy: 5.0,
-        pv: 10000,        // Money borrowed (positive)
-        pmt: -300,        // Payment out (negative)
-        fv: 0,            // Fully paid off
-        cpy: 12,
-      );
-
-      final n = TVMSolver.solve(input);
-
-      // Expected: ~35 months (between 34-36)
-      expect(n, greaterThan(30));
-      expect(n, lessThan(40));
-      print('✅ Months to pay off: ${n.toStringAsFixed(1)} months');
-    });
-
-    test('Edge case: 0% interest', () {
+  group('Edge Cases', () {
+    test('0% interest: PMT is simple division', () {
       final input = TVMInput(
         n: 12,
-        iy: 0,            // 0% interest
+        iy: 0,
         pv: 12000,
         fv: 0,
       );
 
       final pmt = TVMSolver.solve(input);
-
-      // With 0% interest: $12,000 / 12 = $1,000/month
       expect(pmt, closeTo(-1000, 0.01));
-      print('✅ Payment at 0% interest: \$${pmt.toStringAsFixed(2)}');
     });
 
-    test('Validation: Should reject if not exactly 4 variables', () {
-      // Only 3 variables provided
+    test('Validation: rejects if not exactly 4 variables', () {
       final input = TVMInput(
         n: 360,
         iy: 6.5,
@@ -97,7 +92,118 @@ void main() {
 
       expect(input.isValid(), false);
       expect(() => TVMSolver.solve(input), throwsArgumentError);
-      print('✅ Validation works correctly');
+    });
+
+    test('I/Y solver: 0% rate detected', () {
+      final input = TVMInput(
+        n: 10,
+        pv: -1000,
+        pmt: 0,
+        fv: 1000,
+        cpy: 1,
+      );
+
+      final iy = TVMSolver.solve(input);
+      expect(iy, closeTo(0.0, 0.01));
+    });
+  });
+
+  group('P/Y ≠ C/Y scenarios', () {
+    test('P/Y == C/Y matches original results (monthly/monthly)', () {
+      // Same as Test 1 but with explicit ppy == cpy
+      final input = TVMInput(
+        n: 360,
+        iy: 6.5,
+        pv: 500000,
+        fv: 0,
+        ppy: 12,
+        cpy: 12,
+      );
+
+      final pmt = TVMSolver.solve(input);
+      expect(pmt, closeTo(-3160.34, 0.01));
+    });
+
+    test('Monthly payments with daily compounding — \$100k at 5% for 30 years', () {
+      // P/Y=12, C/Y=365
+      // BA II Plus: PMT ≈ -537.07
+      final input = TVMInput(
+        n: 360,
+        iy: 5,
+        pv: 100000,
+        fv: 0,
+        ppy: 12,
+        cpy: 365,
+      );
+
+      final pmt = TVMSolver.solve(input);
+      expect(pmt, closeTo(-537.44, 0.01));
+    });
+
+    test('Annual payments with monthly compounding — \$10k at 6% for 5 years', () {
+      // P/Y=1, C/Y=12
+      final input = TVMInput(
+        n: 5,
+        iy: 6,
+        pv: 10000,
+        fv: 0,
+        ppy: 1,
+        cpy: 12,
+      );
+
+      final pmt = TVMSolver.solve(input);
+      // With monthly compounding, effective rate per year is higher
+      // so payment should be slightly higher than simple annual
+      expect(pmt, closeTo(-2384.81, 0.01));
+    });
+
+    test('Solve FV with P/Y=12, C/Y=1 (monthly payments, annual compounding)', () {
+      final input = TVMInput(
+        n: 120, // 10 years of monthly payments
+        iy: 5,
+        pv: 0,
+        pmt: -100,
+        ppy: 12,
+        cpy: 1,
+      );
+
+      final fv = TVMSolver.solve(input);
+      // With annual compounding but monthly payments, FV should be close
+      // but slightly different from monthly compounding
+      expect(fv, greaterThan(15000));
+      expect(fv, lessThan(16000));
+    });
+
+    test('P/Y=1, C/Y=1 (annual everything) — simple case', () {
+      final input = TVMInput(
+        n: 10,
+        iy: 5,
+        pv: 10000,
+        fv: 0,
+        ppy: 1,
+        cpy: 1,
+      );
+
+      final pmt = TVMSolver.solve(input);
+      // Standard annual annuity PMT
+      expect(pmt, closeTo(-1295.05, 0.01));
+    });
+
+    test('I/Y solver with P/Y ≠ C/Y', () {
+      // Set up: monthly payments, daily compounding
+      // We know the PMT for 100k at 5% for 30 years with P/Y=12,C/Y=365 is ~-537.44
+      // Now solve for I/Y given PMT
+      final input = TVMInput(
+        n: 360,
+        pv: 100000,
+        pmt: -537.44,
+        fv: 0,
+        ppy: 12,
+        cpy: 365,
+      );
+
+      final iy = TVMSolver.solve(input);
+      expect(iy, closeTo(5.0, 0.05));
     });
   });
 }

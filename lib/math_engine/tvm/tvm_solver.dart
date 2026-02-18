@@ -35,9 +35,14 @@ class TVMSolver {
   }
 
   /// Convert annual interest rate to periodic rate
-  /// Example: 6.5% per year with monthly payments = 6.5 / 12 = 0.5416% per month
-  static double _getPeriodicRate(double iy, int cpy) {
-    return (iy / 100) / cpy;
+  /// When ppy == cpy: rate = (iy / 100) / cpy (simple division)
+  /// When ppy != cpy: rate = (1 + iy/100/cpy)^(cpy/ppy) - 1 (compounding conversion)
+  static double _getPeriodicRate(double iy, int ppy, int cpy) {
+    if (ppy == cpy) {
+      return (iy / 100) / cpy;
+    }
+    // Convert nominal rate with cpy compounding to periodic rate for ppy payments
+    return pow(1 + (iy / 100) / cpy, cpy / ppy) - 1;
   }
 
   // ========================================================================
@@ -54,7 +59,7 @@ class TVMSolver {
     final iy = input.iy!;
     final pv = input.pv!;
     final fv = input.fv!;
-    final r = _getPeriodicRate(iy, input.cpy);
+    final r = _getPeriodicRate(iy, input.ppy, input.cpy);
 
     // Edge case: 0% interest
     if (r == 0) {
@@ -87,7 +92,7 @@ class TVMSolver {
     final iy = input.iy!;
     final pmt = input.pmt!;
     final fv = input.fv!;
-    final r = _getPeriodicRate(iy, input.cpy);
+    final r = _getPeriodicRate(iy, input.ppy, input.cpy);
 
     if (r == 0) {
       return -(pmt * n + fv);
@@ -113,7 +118,7 @@ class TVMSolver {
     final iy = input.iy!;
     final pv = input.pv!;
     final pmt = input.pmt!;
-    final r = _getPeriodicRate(iy, input.cpy);
+    final r = _getPeriodicRate(iy, input.ppy, input.cpy);
 
     if (r == 0) {
       return -(pv + pmt * n);
@@ -139,7 +144,7 @@ class TVMSolver {
     final pv = input.pv!;
     final pmt = input.pmt!;
     final fv = input.fv!;
-    final r = _getPeriodicRate(iy, input.cpy);
+    final r = _getPeriodicRate(iy, input.ppy, input.cpy);
 
     if (r == 0) {
       return -(pv + fv) / pmt;
@@ -163,7 +168,7 @@ class TVMSolver {
   // SOLVE FOR INTEREST RATE (I/Y)
   // ========================================================================
   /// This is the hardest one - there's no direct formula!
-  /// We use the Newton-Raphson method (iterative approximation)
+  /// We use Newton-Raphson with bisection fallback.
   ///
   /// Example: "What interest rate am I getting on this loan?"
   static double _solveIY(TVMInput input) {
@@ -172,35 +177,114 @@ class TVMSolver {
     final pmt = input.pmt!;
     final fv = input.fv!;
 
-    // Initial guess: 10% annual rate
-    double rate = 0.1 / input.cpy;
+    // Check 0% special case
+    final zeroCheck = pv + pmt * n + fv;
+    if (zeroCheck.abs() < 1e-10) {
+      return 0.0;
+    }
+
+    // TVM equation: f(r) = PV + PMT*(F-1)/(r*F) + FV/F = 0
+    // where F = (1+r)^n, r = periodic rate per payment period
+    double _f(double r) {
+      if (r.abs() < 1e-14) return pv + pmt * n + fv;
+      final adjustedPmt = (input.pmtMode == 1) ? pmt * (1 + r) : pmt;
+      final f = pow(1 + r, n).toDouble();
+      return pv + adjustedPmt * (f - 1) / (r * f) + fv / f;
+    }
+
+    // Derivative: f'(r)
+    double _fp(double r) {
+      if (r.abs() < 1e-14) return double.nan;
+      final f = pow(1 + r, n).toDouble();
+      final r1 = 1 + r;
+
+      if (input.pmtMode == 1) {
+        final pmtTerm1 = pmt * (f - 1) / (r * f);
+        final pmtTerm2 = pmt * r1 *
+            (n / (r * f * r1) - (f - 1) / (r * r * f));
+        final fvTerm = -fv * n / (f * r1);
+        return pmtTerm1 + pmtTerm2 + fvTerm;
+      } else {
+        final pmtTerm = pmt * (n / (r * f * r1) - (f - 1) / (r * r * f));
+        final fvTerm = -fv * n / (f * r1);
+        return pmtTerm + fvTerm;
+      }
+    }
+
+    /// Convert periodic rate back to annual nominal rate
+    /// When ppy == cpy: annual = r * cpy * 100
+    /// When ppy != cpy: annual = ((1+r)^(ppy/cpy) - 1) * cpy * 100
+    double _periodicToAnnual(double r) {
+      if (input.ppy == input.cpy) {
+        return r * input.cpy * 100;
+      }
+      return (pow(1 + r, input.ppy / input.cpy) - 1) * input.cpy * 100;
+    }
+
+    // Try Newton-Raphson first
+    double rate = 0.1 / input.ppy;
     const maxIterations = 100;
     const tolerance = 1e-10;
 
     for (int i = 0; i < maxIterations; i++) {
-      final factor = pow(1 + rate, n);
-      final adjustedPmt = (input.pmtMode == 1) ? pmt * (1 + rate) : pmt;
-
-      // Calculate present value with current rate guess
-      final pvCalc = adjustedPmt * (factor - 1) / (rate * factor) + fv / factor;
-      final error = pvCalc + pv;
-
-      // Check if we're close enough
+      final error = _f(rate);
       if (error.abs() < tolerance) {
-        return rate * input.cpy * 100; // Convert back to annual percentage
+        return _periodicToAnnual(rate);
       }
 
-      // Calculate derivative for Newton-Raphson
-      final derivative = -adjustedPmt *
-              (n * factor / (rate * rate * factor) -
-                  (factor - 1) / (rate * rate * factor)) -
-          fv * n / (rate * factor * (1 + rate));
+      final deriv = _fp(rate);
+      if (deriv.isNaN || deriv.abs() < 1e-20) break;
 
-      // Update rate guess
-      rate = rate - error / derivative;
+      final newRate = rate - error / deriv;
 
-      // Prevent negative rates
-      if (rate < 0) rate = 0.0001;
+      if (newRate < -1.0 / input.ppy || (newRate - rate).abs() > 1.0) break;
+
+      rate = newRate;
+    }
+
+    // Bisection fallback
+    return _bisectionIY(input, _f);
+  }
+
+  /// Bisection method fallback for I/Y when Newton-Raphson diverges
+  static double _bisectionIY(TVMInput input, double Function(double) f) {
+    double lo = -0.99;
+    double hi = 10.0;
+    final fLo = f(lo);
+    final fHi = f(hi);
+
+    if (fLo.sign == fHi.sign) {
+      lo = -0.5;
+      hi = 1.0;
+      if (f(lo).sign == f(hi).sign) {
+        throw ArgumentError('Could not bracket an interest rate solution');
+      }
+    }
+
+    /// Convert periodic rate back to annual nominal rate
+    double periodicToAnnual(double r) {
+      if (input.ppy == input.cpy) {
+        return r * input.cpy * 100;
+      }
+      return (pow(1 + r, input.ppy / input.cpy) - 1) * input.cpy * 100;
+    }
+
+    const maxIterations = 200;
+    const tolerance = 1e-12;
+
+    for (int i = 0; i < maxIterations; i++) {
+      final mid = (lo + hi) / 2;
+      final fMid = f(mid);
+
+      if (fMid.abs() < tolerance || (hi - lo) / 2 < tolerance) {
+        return periodicToAnnual(mid);
+      }
+
+      if (f(lo).sign == fMid.sign) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
     }
 
     throw ArgumentError('Could not converge on an interest rate solution');

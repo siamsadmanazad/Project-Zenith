@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/nordic_theme.dart';
-import 'features/calculator/presentation/calculator_screen.dart';
+import 'features/calculator/presentation/calculator_shell.dart';
 
 void main() {
   // Configure system UI (status bar, navigation bar)
@@ -21,12 +21,11 @@ class ZenithApp extends StatelessWidget {
       title: 'Zenith - The Classy Financial Calculator',
       debugShowCheckedModeBanner: false,
 
-      // ✨ Apply the Nordic dark theme
+      // Apply the Nordic dark theme
       theme: NordicTheme.darkTheme,
 
-      // 🧮 Launch the Calculator Screen
-      home: const CalculatorScreen(),
+      // Launch the Calculator Shell (dual-mode: keypad + form)
+      home: const CalculatorShell(),
     );
   }
 }
-

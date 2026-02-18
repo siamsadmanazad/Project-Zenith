@@ -12,6 +12,9 @@ class TVMInput {
   // Payment timing: 0 = end of period (default), 1 = beginning
   final int pmtMode;
 
+  // Payments per year (12 = monthly, 1 = annual)
+  final int ppy;
+
   // Compounding periods per year (12 = monthly, 1 = annual)
   final int cpy;
 
@@ -22,6 +25,7 @@ class TVMInput {
     this.pmt,
     this.fv,
     this.pmtMode = 0,  // Default: payments at end of period
+    this.ppy = 12,     // Default: monthly payments
     this.cpy = 12,     // Default: monthly compounding
   });
 
@@ -55,6 +59,7 @@ class TVMInput {
     double? pmt,
     double? fv,
     int? pmtMode,
+    int? ppy,
     int? cpy,
   }) {
     return TVMInput(
@@ -64,12 +69,13 @@ class TVMInput {
       pmt: pmt ?? this.pmt,
       fv: fv ?? this.fv,
       pmtMode: pmtMode ?? this.pmtMode,
+      ppy: ppy ?? this.ppy,
       cpy: cpy ?? this.cpy,
     );
   }
 
   @override
   String toString() {
-    return 'TVMInput(N: $n, I/Y: $iy%, PV: $pv, PMT: $pmt, FV: $fv)';
+    return 'TVMInput(N: $n, I/Y: $iy%, PV: $pv, PMT: $pmt, FV: $fv, P/Y: $ppy, C/Y: $cpy)';
   }
 }

@@ -9,12 +9,20 @@ class GlassButton extends StatefulWidget {
   final VoidCallback? onPressed;
   final String label;
   final bool isPrimary;
+  final Color? accentColor;
+  final bool isHighlighted;
+  final TextStyle? labelStyle;
+  final double? height;
 
   const GlassButton({
     super.key,
     required this.onPressed,
     required this.label,
     this.isPrimary = false,
+    this.accentColor,
+    this.isHighlighted = false,
+    this.labelStyle,
+    this.height,
   });
 
   @override
@@ -68,6 +76,7 @@ class _GlassButtonState extends State<GlassButton>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDisabled = widget.onPressed == null;
+    final accent = widget.accentColor;
 
     return GestureDetector(
       onTapDown: _handleTapDown,
@@ -90,7 +99,7 @@ class _GlassButtonState extends State<GlassButton>
               sigmaY: AppDimensions.glassBlur,
             ),
             child: Container(
-              height: AppDimensions.buttonHeight,
+              height: widget.height ?? AppDimensions.buttonHeight,
               decoration: BoxDecoration(
                 // Primary button has accent gradient
                 gradient: widget.isPrimary && !isDisabled
@@ -106,35 +115,48 @@ class _GlassButtonState extends State<GlassButton>
                 border: Border.all(
                   color: isDisabled
                       ? AppColors.glassBorder.withOpacity(0.3)
-                      : (_isPressed ? AppColors.accent : AppColors.glassBorder),
-                  width: AppDimensions.glassBorderWidth,
+                      : widget.isHighlighted
+                          ? (accent ?? AppColors.accentSecondary)
+                          : (_isPressed
+                              ? (accent ?? AppColors.accent)
+                              : AppColors.glassBorder),
+                  width: widget.isHighlighted ? 2.0 : AppDimensions.glassBorderWidth,
                 ),
-                boxShadow: widget.isPrimary && !isDisabled
+                boxShadow: widget.isHighlighted
                     ? [
                         BoxShadow(
-                          color: AppColors.accent.withOpacity(0.3),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
+                          color: (accent ?? AppColors.accentSecondary).withOpacity(0.3),
+                          blurRadius: 12,
+                          spreadRadius: 1,
                         ),
                       ]
-                    : [
-                        BoxShadow(
-                          color: AppColors.glassShadow,
-                          blurRadius: AppDimensions.glassShadowBlur,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                    : widget.isPrimary && !isDisabled
+                        ? [
+                            BoxShadow(
+                              color: AppColors.accent.withOpacity(0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ]
+                        : [
+                            BoxShadow(
+                              color: AppColors.glassShadow,
+                              blurRadius: AppDimensions.glassShadowBlur,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
               ),
               child: Center(
                 child: Text(
                   widget.label,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: isDisabled
-                        ? AppColors.textDisabled
-                        : AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.2,
-                  ),
+                  style: widget.labelStyle ??
+                      theme.textTheme.labelLarge?.copyWith(
+                        color: isDisabled
+                            ? AppColors.textDisabled
+                            : accent ?? AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
                 ),
               ),
             ),
