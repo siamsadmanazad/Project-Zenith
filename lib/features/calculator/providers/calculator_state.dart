@@ -24,6 +24,9 @@ class CalculatorState {
   final bool cptMode; // true after CPT pressed, awaiting target
   final String? statusMessage; // Flash feedback, e.g. "PV = 500,000.00"
 
+  // 2ND key state — true while the 2ND shift is active
+  final bool twoNdActive;
+
   const CalculatorState({
     this.n,
     this.iy,
@@ -40,6 +43,7 @@ class CalculatorState {
     this.activeVariable,
     this.cptMode = false,
     this.statusMessage,
+    this.twoNdActive = false,
   });
 
   /// Create a copy with updated values
@@ -62,6 +66,7 @@ class CalculatorState {
     Object? activeVariable = _unset,
     bool? cptMode,
     Object? statusMessage = _unset,
+    bool? twoNdActive,
   }) {
     return CalculatorState(
       n: identical(n, _unset) ? this.n : n as double?,
@@ -79,6 +84,7 @@ class CalculatorState {
       activeVariable: identical(activeVariable, _unset) ? this.activeVariable : activeVariable as String?,
       cptMode: cptMode ?? this.cptMode,
       statusMessage: identical(statusMessage, _unset) ? this.statusMessage : statusMessage as String?,
+      twoNdActive: twoNdActive ?? this.twoNdActive,
     );
   }
 
@@ -489,6 +495,40 @@ class CalculatorNotifier extends StateNotifier<CalculatorState> {
       statusMessage: null,
       cptMode: false,
     );
+  }
+
+  // ========== 2ND KEY METHODS ==========
+
+  /// Toggle the 2ND shift key on/off
+  void toggle2nd() {
+    final next = !state.twoNdActive;
+    state = state.copyWith(
+      twoNdActive: next,
+      statusMessage: next ? '2ND' : null,
+    );
+  }
+
+  /// Clear all five TVM variables (2ND + → on physical BA II Plus)
+  void clearTVM() {
+    state = state.copyWith(
+      n: null,
+      iy: null,
+      pv: null,
+      pmt: null,
+      fv: null,
+      displayBuffer: '',
+      activeVariable: null,
+      cptMode: false,
+      twoNdActive: false,
+      clearResult: true,
+      clearError: true,
+      statusMessage: 'TVM CLEARED',
+    );
+  }
+
+  /// Flash a brief status message (used for "coming soon" placeholders)
+  void setStatusMessage(String message) {
+    state = state.copyWith(statusMessage: message);
   }
 }
 

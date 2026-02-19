@@ -82,9 +82,16 @@ class DisplayPanel extends ConsumerWidget {
                     else
                       const SizedBox.shrink(),
 
-                    // P/Y, C/Y, END/BGN indicators
+                    // 2ND, P/Y, C/Y, END/BGN indicators
                     Row(
                       children: [
+                        if (state.twoNdActive) ...[
+                          _IndicatorChip(
+                            label: '2ND',
+                            isActive: true,
+                          ),
+                          const SizedBox(width: 6),
+                        ],
                         _IndicatorChip(
                           label: 'P/Y=${state.ppy}',
                         ),
