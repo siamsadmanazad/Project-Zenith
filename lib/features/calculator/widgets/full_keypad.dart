@@ -1,13 +1,16 @@
 // Full TI BA II Plus Keypad — all 10 rows, ~40 keys
 //
-// Phase 1 functional wiring:
-//   digits, decimal, +/-, backspace, ENTER
+// Functional wiring:
+//   All digits, decimal, +/-, backspace, ENTER, =
 //   TVM keys (N, I/Y, PV, PMT, FV): store or compute (CPT mode)
-//   CPT, CE|C, ON/OFF
-//   2ND + → = CLR TVM
-//   2ND + IRR = BGN/END toggle
-//   2ND + CF = P/Y modal
-//   All others = "— coming soon" status flash
+//   Arithmetic: +, -, ×, ÷, (, ), =
+//   Math: √x, x², 1/x, LN, yˣ, %, INV
+//   Trig (2ND): SIN, COS, TAN, HYP
+//   Combinatorics (2ND): x!, nPr, nCr
+//   Memory: STO, RCL, ANS, MEM
+//   Utility: ROUND, FORMAT, RESET
+//   Financial: Δ%, ICONV (modal)
+//   Control: CPT, CE|C, ON/OFF, 2ND, CLR TVM, BGN, P/Y
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -15,6 +18,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
+import '../../../math_engine/financial/interest_conversion.dart';
 import '../providers/calculator_state.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -22,29 +26,27 @@ import '../providers/calculator_state.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 enum _KeyAction {
-  digit0,
-  digit1,
-  digit2,
-  digit3,
-  digit4,
-  digit5,
-  digit6,
-  digit7,
-  digit8,
-  digit9,
+  digit0, digit1, digit2, digit3, digit4,
+  digit5, digit6, digit7, digit8, digit9,
   decimal,
   toggleSign,
   backspace,
   enter,
-  keyN,
-  keyIY,
-  keyPV,
-  keyPMT,
-  keyFV,
+  equals,
+  keyN, keyIY, keyPV, keyPMT, keyFV,
   twoNd,
   cpt,
   onOff,
   ceC,
+  // Arithmetic
+  opAdd, opSubtract, opMultiply, opDivide,
+  openParen, closeParen,
+  // Math functions
+  sqrtX, xSquared, reciprocal, ln, yPowerX, percent,
+  inv,
+  // Memory
+  sto, rcl, round_,
+  // Unimplemented (worksheets etc — handled via 2ND dispatch)
   unimplemented,
 }
 
@@ -55,7 +57,7 @@ enum _KeyAction {
 enum _KeyCategory {
   digit,
   tvm,
-  operator_,   // trailing underscore avoids Dart keyword conflict
+  operator_,
   function,
   control,
   clear,
@@ -68,7 +70,7 @@ enum _KeyCategory {
 
 class _KeyDef {
   final String primary;
-  final String? secondary; // gold label shown above primary when 2ND active
+  final String? secondary;
   final _KeyAction action;
   final bool isTvmKey;
   final bool isCtrlKey;
@@ -88,33 +90,21 @@ class _KeyDef {
 // Layout — 10 rows matching physical TI BA II Plus
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ROW 1 (5 keys): CPT | ENTER | ↑ | ↓ | ON
+// ROW 1: CPT | ENTER | ↑ | ↓ | ON
 const List<_KeyDef> _row1 = [
-  _KeyDef(
-      primary: 'CPT',
-      secondary: 'QUIT',
-      action: _KeyAction.cpt,
-      isCtrlKey: true,
-      category: _KeyCategory.control),
-  _KeyDef(
-      primary: 'ENTER',
-      secondary: 'SET',
-      action: _KeyAction.enter,
-      isCtrlKey: true,
-      category: _KeyCategory.control),
+  _KeyDef(primary: 'CPT', secondary: 'QUIT', action: _KeyAction.cpt,
+      isCtrlKey: true, category: _KeyCategory.control),
+  _KeyDef(primary: 'ENTER', secondary: 'SET', action: _KeyAction.enter,
+      isCtrlKey: true, category: _KeyCategory.control),
   _KeyDef(primary: '↑', secondary: 'DEL', action: _KeyAction.unimplemented,
       category: _KeyCategory.function),
   _KeyDef(primary: '↓', secondary: 'INS', action: _KeyAction.unimplemented,
       category: _KeyCategory.function),
-  _KeyDef(
-      primary: 'ON',
-      secondary: 'OFF',
-      action: _KeyAction.onOff,
-      isCtrlKey: true,
-      category: _KeyCategory.clear),
+  _KeyDef(primary: 'ON', secondary: 'OFF', action: _KeyAction.onOff,
+      isCtrlKey: true, category: _KeyCategory.clear),
 ];
 
-// ROW 2 (5 keys): 2ND | CF | NPV | IRR | →
+// ROW 2: 2ND | CF | NPV | IRR | →
 const List<_KeyDef> _row2 = [
   _KeyDef(primary: '2ND', action: _KeyAction.twoNd, isCtrlKey: true,
       category: _KeyCategory.special2nd),
@@ -124,15 +114,11 @@ const List<_KeyDef> _row2 = [
       category: _KeyCategory.function),
   _KeyDef(primary: 'IRR', secondary: 'BGN', action: _KeyAction.unimplemented,
       category: _KeyCategory.function),
-  _KeyDef(
-      primary: '→',
-      secondary: 'CLR TVM',
-      action: _KeyAction.backspace,
-      isCtrlKey: true,
-      category: _KeyCategory.clear),
+  _KeyDef(primary: '→', secondary: 'CLR TVM', action: _KeyAction.backspace,
+      isCtrlKey: true, category: _KeyCategory.clear),
 ];
 
-// ROW 3 (5 keys): N | I/Y | PV | PMT | FV  ← TVM row
+// ROW 3: N | I/Y | PV | PMT | FV
 const List<_KeyDef> _row3 = [
   _KeyDef(primary: 'N', action: _KeyAction.keyN, isTvmKey: true,
       category: _KeyCategory.tvm),
@@ -146,35 +132,35 @@ const List<_KeyDef> _row3 = [
       category: _KeyCategory.tvm),
 ];
 
-// ROW 4 (5 keys): % | √x | x² | 1/x | ÷
+// ROW 4: % | √x | x² | 1/x | ÷
 const List<_KeyDef> _row4 = [
-  _KeyDef(primary: '%', secondary: 'HYP', action: _KeyAction.unimplemented,
+  _KeyDef(primary: '%', secondary: 'HYP', action: _KeyAction.percent,
       category: _KeyCategory.function),
-  _KeyDef(primary: '√x', secondary: 'SIN', action: _KeyAction.unimplemented,
+  _KeyDef(primary: '√x', secondary: 'SIN', action: _KeyAction.sqrtX,
       category: _KeyCategory.function),
-  _KeyDef(primary: 'x²', secondary: 'COS', action: _KeyAction.unimplemented,
+  _KeyDef(primary: 'x²', secondary: 'COS', action: _KeyAction.xSquared,
       category: _KeyCategory.function),
-  _KeyDef(primary: '1/x', secondary: 'TAN', action: _KeyAction.unimplemented,
+  _KeyDef(primary: '1/x', secondary: 'TAN', action: _KeyAction.reciprocal,
       category: _KeyCategory.function),
-  _KeyDef(primary: '÷', secondary: 'x!', action: _KeyAction.unimplemented,
+  _KeyDef(primary: '÷', secondary: 'x!', action: _KeyAction.opDivide,
       category: _KeyCategory.operator_),
 ];
 
-// ROW 5 (5 keys): INV | ( | ) | yˣ | ×
+// ROW 5: INV | ( | ) | yˣ | ×
 const List<_KeyDef> _row5 = [
-  _KeyDef(primary: 'INV', secondary: 'eˣ', action: _KeyAction.unimplemented,
+  _KeyDef(primary: 'INV', secondary: 'eˣ', action: _KeyAction.inv,
       category: _KeyCategory.function),
-  _KeyDef(primary: '(', secondary: 'DATA', action: _KeyAction.unimplemented,
+  _KeyDef(primary: '(', secondary: 'DATA', action: _KeyAction.openParen,
       category: _KeyCategory.function),
-  _KeyDef(primary: ')', secondary: 'STAT', action: _KeyAction.unimplemented,
+  _KeyDef(primary: ')', secondary: 'STAT', action: _KeyAction.closeParen,
       category: _KeyCategory.function),
-  _KeyDef(primary: 'yˣ', secondary: 'BOND', action: _KeyAction.unimplemented,
+  _KeyDef(primary: 'yˣ', secondary: 'BOND', action: _KeyAction.yPowerX,
       category: _KeyCategory.function),
-  _KeyDef(primary: '×', secondary: 'nPr', action: _KeyAction.unimplemented,
+  _KeyDef(primary: '×', secondary: 'nPr', action: _KeyAction.opMultiply,
       category: _KeyCategory.operator_),
 ];
 
-// ROW 6 (4 keys): 7 | 8 | 9 | -
+// ROW 6: 7 | 8 | 9 | -
 const List<_KeyDef> _row6 = [
   _KeyDef(primary: '7', secondary: 'DEPR', action: _KeyAction.digit7,
       category: _KeyCategory.digit),
@@ -182,11 +168,11 @@ const List<_KeyDef> _row6 = [
       category: _KeyCategory.digit),
   _KeyDef(primary: '9', secondary: 'BRKEVN', action: _KeyAction.digit9,
       category: _KeyCategory.digit),
-  _KeyDef(primary: '-', secondary: 'nCr', action: _KeyAction.unimplemented,
+  _KeyDef(primary: '-', secondary: 'nCr', action: _KeyAction.opSubtract,
       category: _KeyCategory.operator_),
 ];
 
-// ROW 7 (4 keys): 4 | 5 | 6 | +
+// ROW 7: 4 | 5 | 6 | +
 const List<_KeyDef> _row7 = [
   _KeyDef(primary: '4', secondary: 'DATE', action: _KeyAction.digit4,
       category: _KeyCategory.digit),
@@ -194,11 +180,11 @@ const List<_KeyDef> _row7 = [
       category: _KeyCategory.digit),
   _KeyDef(primary: '6', secondary: 'PROFIT', action: _KeyAction.digit6,
       category: _KeyCategory.digit),
-  _KeyDef(primary: '+', secondary: 'ANS', action: _KeyAction.unimplemented,
+  _KeyDef(primary: '+', secondary: 'ANS', action: _KeyAction.opAdd,
       category: _KeyCategory.operator_),
 ];
 
-// ROW 8 (4 keys): 1 | 2 | 3 | =
+// ROW 8: 1 | 2 | 3 | =
 const List<_KeyDef> _row8 = [
   _KeyDef(primary: '1', secondary: 'MEM', action: _KeyAction.digit1,
       category: _KeyCategory.digit),
@@ -206,23 +192,23 @@ const List<_KeyDef> _row8 = [
       category: _KeyCategory.digit),
   _KeyDef(primary: '3', secondary: 'RESET', action: _KeyAction.digit3,
       category: _KeyCategory.digit),
-  _KeyDef(primary: '=', action: _KeyAction.enter, isCtrlKey: true,
+  _KeyDef(primary: '=', action: _KeyAction.equals, isCtrlKey: true,
       category: _KeyCategory.operator_),
 ];
 
-// ROW 9 (4 keys): ROUND | LN | STO | RCL
+// ROW 9: ROUND | LN | STO | RCL
 const List<_KeyDef> _row9 = [
-  _KeyDef(primary: 'ROUND', action: _KeyAction.unimplemented,
+  _KeyDef(primary: 'ROUND', action: _KeyAction.round_,
       category: _KeyCategory.function),
-  _KeyDef(primary: 'LN', secondary: 'eˣ', action: _KeyAction.unimplemented,
+  _KeyDef(primary: 'LN', secondary: 'eˣ', action: _KeyAction.ln,
       category: _KeyCategory.function),
-  _KeyDef(primary: 'STO', action: _KeyAction.unimplemented,
+  _KeyDef(primary: 'STO', action: _KeyAction.sto,
       category: _KeyCategory.function),
-  _KeyDef(primary: 'RCL', secondary: 'CLR WORK', action: _KeyAction.unimplemented,
+  _KeyDef(primary: 'RCL', secondary: 'CLR WORK', action: _KeyAction.rcl,
       category: _KeyCategory.function),
 ];
 
-// ROW 10 (4 keys): 0 | . | +/- | CE|C
+// ROW 10: 0 | . | +/- | CE|C
 const List<_KeyDef> _row10 = [
   _KeyDef(primary: '0', secondary: 'MEM', action: _KeyAction.digit0,
       category: _KeyCategory.digit),
@@ -268,8 +254,7 @@ class FullKeypad extends ConsumerWidget {
     );
   }
 
-  Widget _buildRow(
-      BuildContext context, WidgetRef ref, List<_KeyDef> keys) {
+  Widget _buildRow(BuildContext context, WidgetRef ref, List<_KeyDef> keys) {
     return Expanded(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -296,6 +281,23 @@ class FullKeypad extends ConsumerWidget {
 
     HapticFeedback.lightImpact();
 
+    // STO/RCL mode intercept — digits handled inside appendDigit,
+    // non-digit cancels mode
+    if ((state.stoMode || state.rclMode) &&
+        !_isDigitAction(key.action) &&
+        key.action != _KeyAction.twoNd) {
+      notifier.cancelMemoryMode();
+      // Fall through to normal dispatch
+    }
+
+    // FORMAT mode intercept — digits handled inside appendDigit,
+    // non-digit cancels
+    if (state.formatMode &&
+        !_isDigitAction(key.action) &&
+        key.action != _KeyAction.twoNd) {
+      notifier.cancelMemoryMode();
+    }
+
     // 2ND key always just toggles
     if (key.action == _KeyAction.twoNd) {
       notifier.toggle2nd();
@@ -304,31 +306,132 @@ class FullKeypad extends ConsumerWidget {
 
     // ── 2ND function dispatch ──────────────────────────────────────────────
     if (state.twoNdActive) {
-      // 2ND + → = CLR TVM
-      if (key.primary == '→') {
-        notifier.clearTVM();
-        return;
+      notifier.toggle2nd(); // consume 2ND
+
+      switch (key.primary) {
+        // Row 1
+        case 'CPT':  // QUIT — exit worksheet (placeholder)
+          notifier.setStatusMessage('QUIT');
+          return;
+        case 'ENTER': // SET — placeholder
+          notifier.setStatusMessage('SET — coming soon');
+          return;
+        case '↑': // DEL — placeholder for worksheet
+          notifier.setStatusMessage('DEL — coming soon');
+          return;
+        case '↓': // INS — placeholder for worksheet
+          notifier.setStatusMessage('INS — coming soon');
+          return;
+
+        // Row 2
+        case '→': // CLR TVM
+          notifier.clearTVM();
+          return;
+        case 'IRR': // BGN/END toggle
+          notifier.updatePmtMode(state.pmtMode == 0 ? 1 : 0);
+          return;
+        case 'CF': // P/Y modal
+          _showPYModal(context, ref);
+          return;
+        case 'NPV': // AMORT — worksheet placeholder
+          notifier.setStatusMessage('AMORT — coming soon');
+          return;
+
+        // Row 4 — trig / HYP / factorial
+        case '%': // HYP toggle
+          notifier.toggleHyp();
+          return;
+        case '√x': // SIN
+          notifier.trigFunction('sin');
+          return;
+        case 'x²': // COS
+          notifier.trigFunction('cos');
+          return;
+        case '1/x': // TAN
+          notifier.trigFunction('tan');
+          return;
+        case '÷': // x!
+          notifier.factorial();
+          return;
+
+        // Row 5 — eˣ / DATA / STAT / BOND / nPr
+        case 'INV': // eˣ
+          notifier.expX();
+          return;
+        case '(': // DATA — worksheet placeholder
+          notifier.setStatusMessage('DATA — coming soon');
+          return;
+        case ')': // STAT — worksheet placeholder
+          notifier.setStatusMessage('STAT — coming soon');
+          return;
+        case 'yˣ': // BOND — worksheet placeholder
+          notifier.setStatusMessage('BOND — coming soon');
+          return;
+        case '×': // nPr
+          notifier.nPrOperator();
+          return;
+
+        // Row 6 — DEPR / Δ% / BRKEVN / nCr
+        case '7': // DEPR — worksheet placeholder
+          notifier.setStatusMessage('DEPR — coming soon');
+          return;
+        case '8': // Δ%
+          notifier.enterDeltaPercent();
+          return;
+        case '9': // BRKEVN — worksheet placeholder
+          notifier.setStatusMessage('BRKEVN — coming soon');
+          return;
+        case '-': // nCr
+          notifier.nCrOperator();
+          return;
+
+        // Row 7 — DATE / ICONV / PROFIT / ANS
+        case '4': // DATE — worksheet placeholder
+          notifier.setStatusMessage('DATE — coming soon');
+          return;
+        case '5': // ICONV
+          _showIConvModal(context, ref);
+          return;
+        case '6': // PROFIT — worksheet placeholder
+          notifier.setStatusMessage('PROFIT — coming soon');
+          return;
+        case '+': // ANS
+          notifier.recallAns();
+          return;
+
+        // Row 8 — MEM / FORMAT / RESET
+        case '1': // MEM
+          notifier.showMemStatus();
+          return;
+        case '2': // FORMAT
+          notifier.enterFormatMode();
+          return;
+        case '3': // RESET
+          notifier.reset();
+          return;
+
+        // Row 9 — eˣ (2ND+LN) / CLR WORK (2ND+RCL)
+        case 'LN': // eˣ
+          notifier.expX();
+          return;
+        case 'RCL': // CLR WORK — placeholder
+          notifier.setStatusMessage('CLR WORK — coming soon');
+          return;
+
+        // Row 10 — MEM (2ND+0) / FORMAT (2ND+.)
+        case '0': // MEM
+          notifier.showMemStatus();
+          return;
+        case '.': // FORMAT
+          notifier.enterFormatMode();
+          return;
       }
-      // 2ND + IRR = BGN/END toggle
-      if (key.primary == 'IRR') {
-        notifier.updatePmtMode(state.pmtMode == 0 ? 1 : 0);
-        notifier.toggle2nd();
-        return;
-      }
-      // 2ND + CF = P/Y modal
-      if (key.primary == 'CF') {
-        notifier.toggle2nd();
-        _showPYModal(context, ref);
-        return;
-      }
-      // Other keys with a secondary label → "coming soon"
+
+      // Fallback for any unhandled 2ND combo
       if (key.secondary != null && key.secondary!.isNotEmpty) {
-        notifier.toggle2nd();
         notifier.setStatusMessage('${key.secondary} — coming soon');
-        return;
       }
-      // No secondary label → cancel 2ND and fall through to primary action
-      notifier.toggle2nd();
+      return;
     }
 
     // ── Primary dispatch ───────────────────────────────────────────────────
@@ -364,11 +467,60 @@ class FullKeypad extends ConsumerWidget {
         notifier.backspace();
 
       case _KeyAction.enter:
+        // ENTER stores into active TVM variable
         final s = ref.read(calculatorProvider);
         if (s.activeVariable != null && s.displayBuffer.isNotEmpty) {
           notifier.storeTVMVariable(s.activeVariable!);
         }
 
+      case _KeyAction.equals:
+        // = triggers arithmetic evaluation
+        if (state.deltaPercentMode) {
+          notifier.enterDeltaPercent(); // computes Δ% result
+        } else {
+          notifier.pressEquals();
+        }
+
+      // Arithmetic operators
+      case _KeyAction.opAdd:
+        notifier.pressOperator('+');
+      case _KeyAction.opSubtract:
+        notifier.pressOperator('-');
+      case _KeyAction.opMultiply:
+        notifier.pressOperator('*');
+      case _KeyAction.opDivide:
+        notifier.pressOperator('/');
+
+      case _KeyAction.openParen:
+        notifier.openParen();
+      case _KeyAction.closeParen:
+        notifier.closeParen();
+
+      // Math functions
+      case _KeyAction.sqrtX:
+        notifier.sqrtX();
+      case _KeyAction.xSquared:
+        notifier.xSquared();
+      case _KeyAction.reciprocal:
+        notifier.reciprocal();
+      case _KeyAction.ln:
+        notifier.naturalLog();
+      case _KeyAction.yPowerX:
+        notifier.yPowerX();
+      case _KeyAction.percent:
+        notifier.percent();
+      case _KeyAction.inv:
+        notifier.toggleInv();
+
+      // Memory
+      case _KeyAction.sto:
+        notifier.enterStoMode();
+      case _KeyAction.rcl:
+        notifier.enterRclMode();
+      case _KeyAction.round_:
+        notifier.roundDisplay();
+
+      // TVM
       case _KeyAction.keyN:
         final s = ref.read(calculatorProvider);
         if (s.cptMode) {
@@ -426,6 +578,19 @@ class FullKeypad extends ConsumerWidget {
     }
   }
 
+  bool _isDigitAction(_KeyAction action) {
+    return action == _KeyAction.digit0 ||
+        action == _KeyAction.digit1 ||
+        action == _KeyAction.digit2 ||
+        action == _KeyAction.digit3 ||
+        action == _KeyAction.digit4 ||
+        action == _KeyAction.digit5 ||
+        action == _KeyAction.digit6 ||
+        action == _KeyAction.digit7 ||
+        action == _KeyAction.digit8 ||
+        action == _KeyAction.digit9;
+  }
+
   // ── P/Y modal ─────────────────────────────────────────────────────────────
 
   void _showPYModal(BuildContext context, WidgetRef ref) {
@@ -438,6 +603,22 @@ class FullKeypad extends ConsumerWidget {
         ),
       ),
       builder: (_) => _PYModal(outerRef: ref),
+    );
+  }
+
+  // ── ICONV modal ───────────────────────────────────────────────────────────
+
+  void _showIConvModal(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppDimensions.radiusL),
+        ),
+      ),
+      builder: (_) => _IConvModal(outerRef: ref),
     );
   }
 }
@@ -488,13 +669,14 @@ class _PYModal extends ConsumerWidget {
                   Navigator.of(context).pop();
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
                     color: selected
                         ? AppColors.accentSecondary.withOpacity(0.2)
                         : AppColors.glassOverlay,
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusS),
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusS),
                     border: Border.all(
                       color: selected
                           ? AppColors.accentSecondary
@@ -516,6 +698,155 @@ class _PYModal extends ConsumerWidget {
           ),
           const SizedBox(height: AppDimensions.spacingS),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ICONV modal — Interest Conversion (Nominal ↔ Effective)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _IConvModal extends ConsumerStatefulWidget {
+  final WidgetRef outerRef;
+  const _IConvModal({required this.outerRef});
+
+  @override
+  ConsumerState<_IConvModal> createState() => _IConvModalState();
+}
+
+class _IConvModalState extends ConsumerState<_IConvModal> {
+  final _nomController = TextEditingController();
+  final _effController = TextEditingController();
+  String? _result;
+
+  @override
+  void dispose() {
+    _nomController.dispose();
+    _effController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(calculatorProvider);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppDimensions.spacingM,
+        AppDimensions.spacingM,
+        AppDimensions.spacingM,
+        AppDimensions.spacingM + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Interest Conversion',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'C/Y = ${state.cpy}',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildField('Nominal Rate (%)', _nomController),
+          const SizedBox(height: 12),
+          _buildField('Effective Rate (%)', _effController),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildButton('NOM → EFF', () {
+                  final nom = double.tryParse(_nomController.text);
+                  if (nom == null) return;
+                  final eff =
+                      InterestConversion.nominalToEffective(nom, state.cpy);
+                  _effController.text = eff.toStringAsFixed(4);
+                  setState(() => _result = 'EFF = ${eff.toStringAsFixed(4)}%');
+                }),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildButton('EFF → NOM', () {
+                  final eff = double.tryParse(_effController.text);
+                  if (eff == null) return;
+                  final nom =
+                      InterestConversion.effectiveToNominal(eff, state.cpy);
+                  _nomController.text = nom.toStringAsFixed(4);
+                  setState(() => _result = 'NOM = ${nom.toStringAsFixed(4)}%');
+                }),
+              ),
+            ],
+          ),
+          if (_result != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _result!,
+              style: TextStyle(
+                color: AppColors.accent,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          const SizedBox(height: AppDimensions.spacingS),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildField(String label, TextEditingController controller) {
+    return TextField(
+      controller: controller,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      style: TextStyle(color: AppColors.textPrimary),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: AppColors.textSecondary),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: AppColors.glassBorder),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusS),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: AppColors.accent),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusS),
+        ),
+        filled: true,
+        fillColor: AppColors.glassOverlay,
+      ),
+    );
+  }
+
+  Widget _buildButton(String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.accent.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusS),
+          border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: AppColors.accent,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -580,9 +911,10 @@ class _FullKeyState extends ConsumerState<_FullKey> {
         primaryColor = AppColors.textPrimary;
     }
 
-    // ── LAYER 2: Active-state overrides (wins over Layer 1) ───────────────
+    // ── LAYER 2: Active-state overrides ───────────────────────────────────
     final bool is2NdKey = key.action == _KeyAction.twoNd;
     final bool isCptKey = key.action == _KeyAction.cpt;
+    final bool isInvKey = key.action == _KeyAction.inv;
 
     if (is2NdKey && state.twoNdActive) {
       borderColor = AppColors.accentSecondary;
@@ -594,14 +926,17 @@ class _FullKeyState extends ConsumerState<_FullKey> {
       borderWidth = 1.5;
       bgColor = AppColors.accentSecondary.withOpacity(0.10);
       primaryColor = AppColors.accentSecondary;
+    } else if (isInvKey && state.invActive) {
+      borderColor = AppColors.accent;
+      borderWidth = 1.5;
+      bgColor = AppColors.accent.withOpacity(0.10);
+      primaryColor = AppColors.accent;
     } else if (key.isTvmKey && state.activeVariable == key.primary) {
-      // TVM key currently focused
       borderColor = AppColors.accent;
       borderWidth = 1.5;
       bgColor = AppColors.accent.withOpacity(0.10);
       primaryColor = AppColors.accent;
     } else if (key.isTvmKey && state.cptMode) {
-      // bgColor keeps amber TVM tint — harmonises with gold text
       borderColor = AppColors.accentSecondary.withOpacity(0.5);
       borderWidth = 1.0;
       primaryColor = AppColors.accentSecondary;
@@ -609,16 +944,10 @@ class _FullKeyState extends ConsumerState<_FullKey> {
         !is2NdKey &&
         key.secondary != null &&
         key.secondary!.isNotEmpty) {
-      // 2ND active and this key has a secondary — dim the primary label
-      // bg/border keep category tints so groups remain distinguishable
       primaryColor = AppColors.textPrimary.withOpacity(0.4);
     }
 
-    // Secondary label opacity: bright when 2ND is active, dim otherwise
-    final double secOpacity =
-        state.twoNdActive && !is2NdKey ? 1.0 : 0.35;
-
-    // Value dot: TVM keys that have a stored value
+    final double secOpacity = state.twoNdActive && !is2NdKey ? 1.0 : 0.35;
     final bool showDot = key.isTvmKey && _hasValue(state, key.primary);
 
     return GestureDetector(
@@ -641,12 +970,10 @@ class _FullKeyState extends ConsumerState<_FullKey> {
               decoration: BoxDecoration(
                 color: bgColor,
                 borderRadius: BorderRadius.circular(AppDimensions.radiusS),
-                border:
-                    Border.all(color: borderColor, width: borderWidth),
+                border: Border.all(color: borderColor, width: borderWidth),
               ),
               child: Stack(
                 children: [
-                  // Secondary (2ND function) label — top-left, gold, 7px
                   if (key.secondary != null && key.secondary!.isNotEmpty)
                     Positioned(
                       top: 2,
@@ -664,8 +991,6 @@ class _FullKeyState extends ConsumerState<_FullKey> {
                         ),
                       ),
                     ),
-
-                  // Value dot — top-right, for TVM keys with stored value
                   if (showDot)
                     Positioned(
                       top: 4,
@@ -679,8 +1004,6 @@ class _FullKeyState extends ConsumerState<_FullKey> {
                         ),
                       ),
                     ),
-
-                  // Primary label — centered
                   Center(
                     child: Text(
                       key.primary,

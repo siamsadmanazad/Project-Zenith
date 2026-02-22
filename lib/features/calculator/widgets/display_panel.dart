@@ -49,56 +49,103 @@ class DisplayPanel extends ConsumerWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Variable chip
-                    if (state.activeVariable != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: state.cptMode
-                              ? AppColors.accentSecondary.withOpacity(0.2)
-                              : AppColors.accent.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-                          border: Border.all(
-                            color: state.cptMode
-                                ? AppColors.accentSecondary.withOpacity(0.5)
-                                : AppColors.accent.withOpacity(0.3),
-                          ),
-                        ),
-                        child: Text(
-                          state.activeVariable!,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: state.cptMode
-                                ? AppColors.accentSecondary
-                                : AppColors.accent,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      )
-                    else
-                      const SizedBox.shrink(),
+                    // Left side: variable chip + operator/paren indicators
+                    Expanded(
+                      child: Row(
+                        children: [
+                          if (state.activeVariable != null) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: state.cptMode
+                                    ? AppColors.accentSecondary.withOpacity(0.2)
+                                    : AppColors.accent.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(
+                                    AppDimensions.radiusXl),
+                                border: Border.all(
+                                  color: state.cptMode
+                                      ? AppColors.accentSecondary
+                                          .withOpacity(0.5)
+                                      : AppColors.accent.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Text(
+                                state.activeVariable!,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: state.cptMode
+                                      ? AppColors.accentSecondary
+                                      : AppColors.accent,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
 
-                    // 2ND, P/Y, C/Y, END/BGN indicators
+                          // Pending operator indicator
+                          if (state.pendingOperator != null) ...[
+                            _IndicatorChip(
+                              label: state.pendingOperator!,
+                              isActive: true,
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+
+                          // Open paren count
+                          if (state.openParenCount > 0) ...[
+                            _IndicatorChip(
+                              label: '( ${state.openParenCount}',
+                              isActive: true,
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+
+                          // STO/RCL mode
+                          if (state.stoMode) ...[
+                            _IndicatorChip(label: 'STO', isActive: true),
+                            const SizedBox(width: 6),
+                          ],
+                          if (state.rclMode) ...[
+                            _IndicatorChip(label: 'RCL', isActive: true),
+                            const SizedBox(width: 6),
+                          ],
+
+                          // INV indicator
+                          if (state.invActive) ...[
+                            _IndicatorChip(label: 'INV', isActive: true),
+                            const SizedBox(width: 6),
+                          ],
+
+                          // HYP indicator
+                          if (state.hypActive) ...[
+                            _IndicatorChip(label: 'HYP', isActive: true),
+                            const SizedBox(width: 6),
+                          ],
+
+                          // Δ% mode
+                          if (state.deltaPercentMode) ...[
+                            _IndicatorChip(label: 'Δ%', isActive: true),
+                            const SizedBox(width: 6),
+                          ],
+                        ],
+                      ),
+                    ),
+
+                    // Right side: 2ND, P/Y, C/Y, END/BGN
                     Row(
                       children: [
                         if (state.twoNdActive) ...[
-                          _IndicatorChip(
-                            label: '2ND',
-                            isActive: true,
-                          ),
+                          _IndicatorChip(label: '2ND', isActive: true),
                           const SizedBox(width: 6),
                         ],
-                        _IndicatorChip(
-                          label: 'P/Y=${state.ppy}',
-                        ),
+                        _IndicatorChip(label: 'P/Y=${state.ppy}'),
                         const SizedBox(width: 6),
-                        _IndicatorChip(
-                          label: 'C/Y=${state.cpy}',
-                        ),
+                        _IndicatorChip(label: 'C/Y=${state.cpy}'),
                         const SizedBox(width: 6),
                         _IndicatorChip(
                           label: state.pmtMode == 1 ? 'BGN' : 'END',
@@ -130,7 +177,8 @@ class DisplayPanel extends ConsumerWidget {
                     maxLines: 1,
                   ),
                 )
-                    .animate(key: ValueKey(state.result ?? state.displayBuffer))
+                    .animate(
+                        key: ValueKey(state.result ?? state.displayBuffer))
                     .fadeIn(duration: 200.ms)
                     .scale(
                       begin: const Offset(0.95, 0.95),
@@ -177,15 +225,12 @@ class DisplayPanel extends ConsumerWidget {
   }
 
   String _getDisplayText(CalculatorState state) {
-    // If there's a result being shown on display
     if (state.result != null && state.displayBuffer.isNotEmpty) {
       return NumberFormatter.formatBuffer(state.displayBuffer);
     }
-    // If user is typing
     if (state.displayBuffer.isNotEmpty) {
       return NumberFormatter.formatBuffer(state.displayBuffer);
     }
-    // Default
     return '0';
   }
 }
