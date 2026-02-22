@@ -1,48 +1,55 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_dimensions.dart';
+import '../../../core/utils/haptic_service.dart';
 import '../providers/calculator_mode_provider.dart';
 
-/// Glassmorphic pill button for switching between keypad and form modes
-class ModeToggleButton extends StatefulWidget {
+/// Glassmorphic segmented control pill for switching between keypad and form modes
+class ModeSegmentedControl extends StatefulWidget {
   final CalculatorMode currentMode;
-  final VoidCallback onToggle;
+  final ValueChanged<CalculatorMode> onModeChanged;
 
-  const ModeToggleButton({
+  const ModeSegmentedControl({
     super.key,
     required this.currentMode,
-    required this.onToggle,
+    required this.onModeChanged,
   });
 
   @override
-  State<ModeToggleButton> createState() => _ModeToggleButtonState();
+  State<ModeSegmentedControl> createState() => _ModeSegmentedControlState();
 }
 
-class _ModeToggleButtonState extends State<ModeToggleButton>
+class _ModeSegmentedControlState extends State<ModeSegmentedControl>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late Animation<double> _slide;
+
+  static const double _segW   = 44;
+  static const double _height = 30;
+  static const double _pad    = 2;
+  static const double _radius = _height / 2;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 350),
       value: widget.currentMode == CalculatorMode.keypad ? 0.0 : 1.0,
+    );
+    _slide = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOutCubicEmphasized,
     );
   }
 
   @override
-  void didUpdateWidget(ModeToggleButton oldWidget) {
+  void didUpdateWidget(ModeSegmentedControl oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.currentMode != oldWidget.currentMode) {
-      if (widget.currentMode == CalculatorMode.form) {
-        _controller.forward();
-      } else {
-        _controller.reverse();
-      }
+      widget.currentMode == CalculatorMode.form
+          ? _controller.forward()
+          : _controller.reverse();
     }
   }
 
@@ -52,50 +59,98 @@ class _ModeToggleButtonState extends State<ModeToggleButton>
     super.dispose();
   }
 
+  void _onTap(CalculatorMode mode) {
+    if (widget.currentMode == mode) return;
+    HapticService.mode();
+    widget.onModeChanged(mode);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        widget.onToggle();
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.glassOverlay,
-              borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-              border: Border.all(
-                color: AppColors.glassBorder,
-                width: AppDimensions.glassBorderWidth,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.glassShadow,
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) {
-                return Transform.rotate(
-                  angle: _controller.value * 3.14159,
-                  child: Icon(
-                    widget.currentMode == CalculatorMode.keypad
-                        ? Icons.grid_view_rounded
-                        : Icons.list_rounded,
-                    size: 20,
-                    color: AppColors.textSecondary,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(_radius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          width: _segW * 2 + _pad * 2,
+          height: _height,
+          decoration: BoxDecoration(
+            color: AppColors.glassOverlay,
+            borderRadius: BorderRadius.circular(_radius),
+            border: Border.all(color: AppColors.glassBorder, width: 0.5),
+          ),
+          child: AnimatedBuilder(
+            animation: _slide,
+            builder: (context, _) {
+              // Smooth color lerp for icons
+              final keypadColor = Color.lerp(
+                AppColors.textSecondary,
+                AppColors.accent,
+                1 - _slide.value,
+              )!;
+              final formColor = Color.lerp(
+                AppColors.textSecondary,
+                AppColors.accent,
+                _slide.value,
+              )!;
+
+              // Scale: active icon is slightly larger
+              final keypadScale = 0.9 + 0.1 * (1 - _slide.value);
+              final formScale   = 0.9 + 0.1 * _slide.value;
+
+              return Stack(
+                children: [
+                  // Sliding pill highlight with glow
+                  Positioned(
+                    left: _pad + _slide.value * _segW,
+                    top: _pad,
+                    child: Container(
+                      width: _segW,
+                      height: _height - _pad * 2,
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withOpacity(0.13),
+                        borderRadius: BorderRadius.circular(_radius - _pad),
+                        border: Border.all(
+                          color: AppColors.accent.withOpacity(0.25),
+                          width: 0.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.accent.withOpacity(0.18),
+                            blurRadius: 8,
+                            spreadRadius: 0,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                );
-              },
-            ),
+                  // Icons with animated color + scale
+                  Row(
+                    children: [
+                      _segment(CalculatorMode.keypad, Icons.grid_view_rounded, keypadColor, keypadScale),
+                      _segment(CalculatorMode.form,   Icons.list_rounded,      formColor,   formScale),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _segment(CalculatorMode mode, IconData icon, Color color, double scale) {
+    return GestureDetector(
+      onTap: () => _onTap(mode),
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: _segW,
+        height: _height,
+        child: Center(
+          child: Transform.scale(
+            scale: scale,
+            child: Icon(icon, size: 14, color: color),
           ),
         ),
       ),

@@ -26,6 +26,7 @@ class FormCalculatorScreen extends ConsumerWidget {
         ),
       ),
       child: SafeArea(
+        top: false,
         child: Column(
           children: [
             // ============ RESULT DISPLAY ============

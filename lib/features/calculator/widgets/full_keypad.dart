@@ -14,12 +14,20 @@
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
+import '../../../core/utils/haptic_service.dart';
 import '../../../math_engine/financial/interest_conversion.dart';
 import '../providers/calculator_state.dart';
+import 'worksheets/cf_worksheet_modal.dart';
+import 'worksheets/amort_worksheet_modal.dart';
+import 'worksheets/bond_worksheet_modal.dart';
+import 'worksheets/depr_worksheet_modal.dart';
+import 'worksheets/stat_data_modal.dart';
+import 'worksheets/date_worksheet_modal.dart';
+import 'worksheets/brkevn_worksheet_modal.dart';
+import 'worksheets/profit_worksheet_modal.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Key action enum
@@ -46,8 +54,8 @@ enum _KeyAction {
   inv,
   // Memory
   sto, rcl, round_,
-  // Unimplemented (worksheets etc — handled via 2ND dispatch)
-  unimplemented,
+  // Worksheet navigation
+  arrowUp, arrowDown, cf, npv, irr,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -96,9 +104,9 @@ const List<_KeyDef> _row1 = [
       isCtrlKey: true, category: _KeyCategory.control),
   _KeyDef(primary: 'ENTER', secondary: 'SET', action: _KeyAction.enter,
       isCtrlKey: true, category: _KeyCategory.control),
-  _KeyDef(primary: '↑', secondary: 'DEL', action: _KeyAction.unimplemented,
+  _KeyDef(primary: '↑', secondary: 'DEL', action: _KeyAction.arrowUp,
       category: _KeyCategory.function),
-  _KeyDef(primary: '↓', secondary: 'INS', action: _KeyAction.unimplemented,
+  _KeyDef(primary: '↓', secondary: 'INS', action: _KeyAction.arrowDown,
       category: _KeyCategory.function),
   _KeyDef(primary: 'ON', secondary: 'OFF', action: _KeyAction.onOff,
       isCtrlKey: true, category: _KeyCategory.clear),
@@ -108,11 +116,11 @@ const List<_KeyDef> _row1 = [
 const List<_KeyDef> _row2 = [
   _KeyDef(primary: '2ND', action: _KeyAction.twoNd, isCtrlKey: true,
       category: _KeyCategory.special2nd),
-  _KeyDef(primary: 'CF', secondary: 'P·Y', action: _KeyAction.unimplemented,
+  _KeyDef(primary: 'CF', secondary: 'P·Y', action: _KeyAction.cf,
       category: _KeyCategory.function),
-  _KeyDef(primary: 'NPV', secondary: 'AMORT', action: _KeyAction.unimplemented,
+  _KeyDef(primary: 'NPV', secondary: 'AMORT', action: _KeyAction.npv,
       category: _KeyCategory.function),
-  _KeyDef(primary: 'IRR', secondary: 'BGN', action: _KeyAction.unimplemented,
+  _KeyDef(primary: 'IRR', secondary: 'BGN', action: _KeyAction.irr,
       category: _KeyCategory.function),
   _KeyDef(primary: '→', secondary: 'CLR TVM', action: _KeyAction.backspace,
       isCtrlKey: true, category: _KeyCategory.clear),
@@ -279,7 +287,23 @@ class FullKeypad extends ConsumerWidget {
     final notifier = ref.read(calculatorProvider.notifier);
     final state = ref.read(calculatorProvider);
 
-    HapticFeedback.lightImpact();
+    // Category-aware haptic feedback
+    switch (key.category) {
+      case _KeyCategory.digit:
+        HapticService.digit();
+      case _KeyCategory.tvm:
+        HapticService.tvm();
+      case _KeyCategory.operator_:
+        HapticService.operator_();
+      case _KeyCategory.function:
+        HapticService.function_();
+      case _KeyCategory.control:
+        HapticService.function_();
+      case _KeyCategory.clear:
+        HapticService.clear();
+      case _KeyCategory.special2nd:
+        HapticService.function_();
+    }
 
     // STO/RCL mode intercept — digits handled inside appendDigit,
     // non-digit cancels mode
@@ -316,11 +340,19 @@ class FullKeypad extends ConsumerWidget {
         case 'ENTER': // SET — placeholder
           notifier.setStatusMessage('SET — coming soon');
           return;
-        case '↑': // DEL — placeholder for worksheet
-          notifier.setStatusMessage('DEL — coming soon');
+        case '↑': // DEL — remove current entry in CF/DATA worksheet
+          if (state.activeWorksheet != null) {
+            notifier.setStatusMessage('DEL — open worksheet to delete entry');
+          } else {
+            notifier.setStatusMessage('DEL — no active worksheet');
+          }
           return;
-        case '↓': // INS — placeholder for worksheet
-          notifier.setStatusMessage('INS — coming soon');
+        case '↓': // INS — insert entry in CF/DATA worksheet
+          if (state.activeWorksheet != null) {
+            notifier.setStatusMessage('INS — open worksheet to insert entry');
+          } else {
+            notifier.setStatusMessage('INS — no active worksheet');
+          }
           return;
 
         // Row 2
@@ -333,8 +365,8 @@ class FullKeypad extends ConsumerWidget {
         case 'CF': // P/Y modal
           _showPYModal(context, ref);
           return;
-        case 'NPV': // AMORT — worksheet placeholder
-          notifier.setStatusMessage('AMORT — coming soon');
+        case 'NPV': // AMORT — amortization worksheet
+          showAmortWorksheetModal(context);
           return;
 
         // Row 4 — trig / HYP / factorial
@@ -358,42 +390,42 @@ class FullKeypad extends ConsumerWidget {
         case 'INV': // eˣ
           notifier.expX();
           return;
-        case '(': // DATA — worksheet placeholder
-          notifier.setStatusMessage('DATA — coming soon');
+        case '(': // DATA — statistics data entry worksheet
+          showStatDataModal(context);
           return;
-        case ')': // STAT — worksheet placeholder
-          notifier.setStatusMessage('STAT — coming soon');
+        case ')': // STAT — statistics compute worksheet
+          showStatDataModal(context);
           return;
-        case 'yˣ': // BOND — worksheet placeholder
-          notifier.setStatusMessage('BOND — coming soon');
+        case 'yˣ': // BOND — bond worksheet
+          showBondWorksheetModal(context);
           return;
         case '×': // nPr
           notifier.nPrOperator();
           return;
 
         // Row 6 — DEPR / Δ% / BRKEVN / nCr
-        case '7': // DEPR — worksheet placeholder
-          notifier.setStatusMessage('DEPR — coming soon');
+        case '7': // DEPR — depreciation worksheet
+          showDeprWorksheetModal(context);
           return;
         case '8': // Δ%
           notifier.enterDeltaPercent();
           return;
-        case '9': // BRKEVN — worksheet placeholder
-          notifier.setStatusMessage('BRKEVN — coming soon');
+        case '9': // BRKEVN — break-even worksheet
+          showBrkevnWorksheetModal(context);
           return;
         case '-': // nCr
           notifier.nCrOperator();
           return;
 
         // Row 7 — DATE / ICONV / PROFIT / ANS
-        case '4': // DATE — worksheet placeholder
-          notifier.setStatusMessage('DATE — coming soon');
+        case '4': // DATE — date worksheet
+          showDateWorksheetModal(context);
           return;
         case '5': // ICONV
           _showIConvModal(context, ref);
           return;
-        case '6': // PROFIT — worksheet placeholder
-          notifier.setStatusMessage('PROFIT — coming soon');
+        case '6': // PROFIT — profit margin worksheet
+          showProfitWorksheetModal(context);
           return;
         case '+': // ANS
           notifier.recallAns();
@@ -414,8 +446,13 @@ class FullKeypad extends ConsumerWidget {
         case 'LN': // eˣ
           notifier.expX();
           return;
-        case 'RCL': // CLR WORK — placeholder
-          notifier.setStatusMessage('CLR WORK — coming soon');
+        case 'RCL': // CLR WORK — deactivate active worksheet
+          if (state.activeWorksheet != null) {
+            notifier.setActiveWorksheet(null);
+            notifier.setStatusMessage('WORK CLEARED');
+          } else {
+            notifier.setStatusMessage('CLR WORK — no active worksheet');
+          }
           return;
 
         // Row 10 — MEM (2ND+0) / FORMAT (2ND+.)
@@ -570,11 +607,30 @@ class FullKeypad extends ConsumerWidget {
       case _KeyAction.onOff:
         notifier.clearEntry();
 
+      // Worksheet navigation
+      case _KeyAction.arrowUp:
+        if (state.activeWorksheet != null) {
+          notifier.setStatusMessage('↑ — use worksheet UI to navigate');
+        } else {
+          notifier.setStatusMessage('↑ — no active worksheet');
+        }
+      case _KeyAction.arrowDown:
+        if (state.activeWorksheet != null) {
+          notifier.setStatusMessage('↓ — use worksheet UI to navigate');
+        } else {
+          notifier.setStatusMessage('↓ — no active worksheet');
+        }
+
+      // Worksheet openers
+      case _KeyAction.cf:
+        showCfWorksheetModal(context);
+      case _KeyAction.npv:
+        showCfWorksheetModal(context); // NPV computed inside CF modal
+      case _KeyAction.irr:
+        showCfWorksheetModal(context); // IRR computed inside CF modal
+
       case _KeyAction.twoNd:
         break; // handled above
-
-      case _KeyAction.unimplemented:
-        notifier.setStatusMessage('${key.primary} — coming soon');
     }
   }
 

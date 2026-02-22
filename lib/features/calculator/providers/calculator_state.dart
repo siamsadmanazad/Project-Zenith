@@ -52,6 +52,9 @@ class CalculatorState {
   final double? deltaPercentOld;
   final bool deltaPercentMode;
 
+  // Worksheets
+  final String? activeWorksheet;
+
   const CalculatorState({
     this.n,
     this.iy,
@@ -82,6 +85,7 @@ class CalculatorState {
     this.formatMode = false,
     this.deltaPercentOld,
     this.deltaPercentMode = false,
+    this.activeWorksheet,
   });
 
   CalculatorState copyWith({
@@ -116,6 +120,7 @@ class CalculatorState {
     bool? formatMode,
     Object? deltaPercentOld = _unset,
     bool? deltaPercentMode,
+    Object? activeWorksheet = _unset,
   }) {
     return CalculatorState(
       n: identical(n, _unset) ? this.n : n as double?,
@@ -167,6 +172,9 @@ class CalculatorState {
           ? this.deltaPercentOld
           : deltaPercentOld as double?,
       deltaPercentMode: deltaPercentMode ?? this.deltaPercentMode,
+      activeWorksheet: identical(activeWorksheet, _unset)
+          ? this.activeWorksheet
+          : activeWorksheet as String?,
     );
   }
 
@@ -1019,6 +1027,10 @@ class CalculatorNotifier extends StateNotifier<CalculatorState> {
 
   void setStatusMessage(String message) {
     state = state.copyWith(statusMessage: message);
+  }
+
+  void setActiveWorksheet(String? worksheet) {
+    state = state.copyWith(activeWorksheet: worksheet);
   }
 
   // ========== HELPERS ==========

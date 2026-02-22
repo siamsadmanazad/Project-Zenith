@@ -20,9 +20,7 @@ class _CalculatorShellState extends ConsumerState<CalculatorShell> {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(
-      initialPage: 0, // Keypad first
-    );
+    _pageController = PageController(initialPage: 0);
   }
 
   @override
@@ -31,48 +29,45 @@ class _CalculatorShellState extends ConsumerState<CalculatorShell> {
     super.dispose();
   }
 
-  void _toggleMode() {
-    final currentMode = ref.read(calculatorModeProvider);
-    final newMode = currentMode == CalculatorMode.keypad
-        ? CalculatorMode.form
-        : CalculatorMode.keypad;
-
-    ref.read(calculatorModeProvider.notifier).state = newMode;
-
+  void _setMode(CalculatorMode mode) {
+    ref.read(calculatorModeProvider.notifier).state = mode;
     _pageController.animateToPage(
-      newMode == CalculatorMode.keypad ? 0 : 1,
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeOutCubic,
+      mode == CalculatorMode.keypad ? 0 : 1,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeInOutCubicEmphasized,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final mode = ref.watch(calculatorModeProvider);
+    final topPadding = MediaQuery.of(context).padding.top;
 
     return Scaffold(
-      body: Stack(
+      body: Column(
         children: [
-          // Page view with both modes
-          PageView(
-            controller: _pageController,
-            onPageChanged: (index) {
-              ref.read(calculatorModeProvider.notifier).state =
-                  index == 0 ? CalculatorMode.keypad : CalculatorMode.form;
-            },
-            children: const [
-              KeypadCalculatorScreen(),
-              FormCalculatorScreen(),
-            ],
-          ),
-
-          // Floating mode toggle button — top right
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            right: 16,
-            child: ModeToggleButton(
+          // Segmented control pill between status bar and content
+          SizedBox(height: topPadding + 8),
+          Center(
+            child: ModeSegmentedControl(
               currentMode: mode,
-              onToggle: _toggleMode,
+              onModeChanged: _setMode,
+            ),
+          ),
+          const SizedBox(height: 4),
+
+          // Page view with both modes
+          Expanded(
+            child: PageView(
+              controller: _pageController,
+              onPageChanged: (index) {
+                ref.read(calculatorModeProvider.notifier).state =
+                    index == 0 ? CalculatorMode.keypad : CalculatorMode.form;
+              },
+              children: const [
+                KeypadCalculatorScreen(),
+                FormCalculatorScreen(),
+              ],
             ),
           ),
         ],

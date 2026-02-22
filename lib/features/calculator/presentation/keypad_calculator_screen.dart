@@ -16,6 +16,7 @@ class KeypadCalculatorScreen extends StatelessWidget {
         gradient: AppColors.backgroundGradient,
       ),
       child: SafeArea(
+        top: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: AppDimensions.spacingS,
