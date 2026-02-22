@@ -49,6 +49,20 @@ enum _KeyAction {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Key category enum — drives Layer 1 resting tints
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum _KeyCategory {
+  digit,
+  tvm,
+  operator_,   // trailing underscore avoids Dart keyword conflict
+  function,
+  control,
+  clear,
+  special2nd,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Key definition
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -58,6 +72,7 @@ class _KeyDef {
   final _KeyAction action;
   final bool isTvmKey;
   final bool isCtrlKey;
+  final _KeyCategory category;
 
   const _KeyDef({
     required this.primary,
@@ -65,6 +80,7 @@ class _KeyDef {
     required this.action,
     this.isTvmKey = false,
     this.isCtrlKey = false,
+    this.category = _KeyCategory.function,
   });
 }
 
@@ -78,117 +94,144 @@ const List<_KeyDef> _row1 = [
       primary: 'CPT',
       secondary: 'QUIT',
       action: _KeyAction.cpt,
-      isCtrlKey: true),
+      isCtrlKey: true,
+      category: _KeyCategory.control),
   _KeyDef(
       primary: 'ENTER',
       secondary: 'SET',
       action: _KeyAction.enter,
-      isCtrlKey: true),
-  _KeyDef(primary: '↑', secondary: 'DEL', action: _KeyAction.unimplemented),
-  _KeyDef(primary: '↓', secondary: 'INS', action: _KeyAction.unimplemented),
+      isCtrlKey: true,
+      category: _KeyCategory.control),
+  _KeyDef(primary: '↑', secondary: 'DEL', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
+  _KeyDef(primary: '↓', secondary: 'INS', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
   _KeyDef(
       primary: 'ON',
       secondary: 'OFF',
       action: _KeyAction.onOff,
-      isCtrlKey: true),
+      isCtrlKey: true,
+      category: _KeyCategory.clear),
 ];
 
 // ROW 2 (5 keys): 2ND | CF | NPV | IRR | →
 const List<_KeyDef> _row2 = [
-  _KeyDef(primary: '2ND', action: _KeyAction.twoNd, isCtrlKey: true),
-  _KeyDef(
-      primary: 'CF', secondary: 'P·Y', action: _KeyAction.unimplemented),
-  _KeyDef(
-      primary: 'NPV',
-      secondary: 'AMORT',
-      action: _KeyAction.unimplemented),
-  _KeyDef(
-      primary: 'IRR', secondary: 'BGN', action: _KeyAction.unimplemented),
+  _KeyDef(primary: '2ND', action: _KeyAction.twoNd, isCtrlKey: true,
+      category: _KeyCategory.special2nd),
+  _KeyDef(primary: 'CF', secondary: 'P·Y', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
+  _KeyDef(primary: 'NPV', secondary: 'AMORT', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
+  _KeyDef(primary: 'IRR', secondary: 'BGN', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
   _KeyDef(
       primary: '→',
       secondary: 'CLR TVM',
       action: _KeyAction.backspace,
-      isCtrlKey: true),
+      isCtrlKey: true,
+      category: _KeyCategory.clear),
 ];
 
 // ROW 3 (5 keys): N | I/Y | PV | PMT | FV  ← TVM row
 const List<_KeyDef> _row3 = [
-  _KeyDef(primary: 'N', action: _KeyAction.keyN, isTvmKey: true),
-  _KeyDef(primary: 'I/Y', action: _KeyAction.keyIY, isTvmKey: true),
-  _KeyDef(primary: 'PV', action: _KeyAction.keyPV, isTvmKey: true),
-  _KeyDef(primary: 'PMT', action: _KeyAction.keyPMT, isTvmKey: true),
-  _KeyDef(primary: 'FV', action: _KeyAction.keyFV, isTvmKey: true),
+  _KeyDef(primary: 'N', action: _KeyAction.keyN, isTvmKey: true,
+      category: _KeyCategory.tvm),
+  _KeyDef(primary: 'I/Y', action: _KeyAction.keyIY, isTvmKey: true,
+      category: _KeyCategory.tvm),
+  _KeyDef(primary: 'PV', action: _KeyAction.keyPV, isTvmKey: true,
+      category: _KeyCategory.tvm),
+  _KeyDef(primary: 'PMT', action: _KeyAction.keyPMT, isTvmKey: true,
+      category: _KeyCategory.tvm),
+  _KeyDef(primary: 'FV', action: _KeyAction.keyFV, isTvmKey: true,
+      category: _KeyCategory.tvm),
 ];
 
 // ROW 4 (5 keys): % | √x | x² | 1/x | ÷
 const List<_KeyDef> _row4 = [
-  _KeyDef(primary: '%', secondary: 'HYP', action: _KeyAction.unimplemented),
-  _KeyDef(
-      primary: '√x', secondary: 'SIN', action: _KeyAction.unimplemented),
-  _KeyDef(
-      primary: 'x²', secondary: 'COS', action: _KeyAction.unimplemented),
-  _KeyDef(
-      primary: '1/x', secondary: 'TAN', action: _KeyAction.unimplemented),
-  _KeyDef(primary: '÷', secondary: 'x!', action: _KeyAction.unimplemented),
+  _KeyDef(primary: '%', secondary: 'HYP', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
+  _KeyDef(primary: '√x', secondary: 'SIN', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
+  _KeyDef(primary: 'x²', secondary: 'COS', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
+  _KeyDef(primary: '1/x', secondary: 'TAN', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
+  _KeyDef(primary: '÷', secondary: 'x!', action: _KeyAction.unimplemented,
+      category: _KeyCategory.operator_),
 ];
 
 // ROW 5 (5 keys): INV | ( | ) | yˣ | ×
 const List<_KeyDef> _row5 = [
-  _KeyDef(
-      primary: 'INV', secondary: 'eˣ', action: _KeyAction.unimplemented),
-  _KeyDef(
-      primary: '(', secondary: 'DATA', action: _KeyAction.unimplemented),
-  _KeyDef(
-      primary: ')', secondary: 'STAT', action: _KeyAction.unimplemented),
-  _KeyDef(
-      primary: 'yˣ', secondary: 'BOND', action: _KeyAction.unimplemented),
-  _KeyDef(
-      primary: '×', secondary: 'nPr', action: _KeyAction.unimplemented),
+  _KeyDef(primary: 'INV', secondary: 'eˣ', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
+  _KeyDef(primary: '(', secondary: 'DATA', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
+  _KeyDef(primary: ')', secondary: 'STAT', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
+  _KeyDef(primary: 'yˣ', secondary: 'BOND', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
+  _KeyDef(primary: '×', secondary: 'nPr', action: _KeyAction.unimplemented,
+      category: _KeyCategory.operator_),
 ];
 
 // ROW 6 (4 keys): 7 | 8 | 9 | -
 const List<_KeyDef> _row6 = [
-  _KeyDef(primary: '7', secondary: 'DEPR', action: _KeyAction.digit7),
-  _KeyDef(primary: '8', secondary: 'Δ%', action: _KeyAction.digit8),
-  _KeyDef(primary: '9', secondary: 'BRKEVN', action: _KeyAction.digit9),
-  _KeyDef(primary: '-', secondary: 'nCr', action: _KeyAction.unimplemented),
+  _KeyDef(primary: '7', secondary: 'DEPR', action: _KeyAction.digit7,
+      category: _KeyCategory.digit),
+  _KeyDef(primary: '8', secondary: 'Δ%', action: _KeyAction.digit8,
+      category: _KeyCategory.digit),
+  _KeyDef(primary: '9', secondary: 'BRKEVN', action: _KeyAction.digit9,
+      category: _KeyCategory.digit),
+  _KeyDef(primary: '-', secondary: 'nCr', action: _KeyAction.unimplemented,
+      category: _KeyCategory.operator_),
 ];
 
 // ROW 7 (4 keys): 4 | 5 | 6 | +
 const List<_KeyDef> _row7 = [
-  _KeyDef(primary: '4', secondary: 'DATE', action: _KeyAction.digit4),
-  _KeyDef(primary: '5', secondary: 'ICONV', action: _KeyAction.digit5),
-  _KeyDef(primary: '6', secondary: 'PROFIT', action: _KeyAction.digit6),
-  _KeyDef(
-      primary: '+', secondary: 'ANS', action: _KeyAction.unimplemented),
+  _KeyDef(primary: '4', secondary: 'DATE', action: _KeyAction.digit4,
+      category: _KeyCategory.digit),
+  _KeyDef(primary: '5', secondary: 'ICONV', action: _KeyAction.digit5,
+      category: _KeyCategory.digit),
+  _KeyDef(primary: '6', secondary: 'PROFIT', action: _KeyAction.digit6,
+      category: _KeyCategory.digit),
+  _KeyDef(primary: '+', secondary: 'ANS', action: _KeyAction.unimplemented,
+      category: _KeyCategory.operator_),
 ];
 
 // ROW 8 (4 keys): 1 | 2 | 3 | =
 const List<_KeyDef> _row8 = [
-  _KeyDef(primary: '1', secondary: 'MEM', action: _KeyAction.digit1),
-  _KeyDef(primary: '2', secondary: 'FORMAT', action: _KeyAction.digit2),
-  _KeyDef(primary: '3', secondary: 'RESET', action: _KeyAction.digit3),
-  _KeyDef(primary: '=', action: _KeyAction.enter, isCtrlKey: true),
+  _KeyDef(primary: '1', secondary: 'MEM', action: _KeyAction.digit1,
+      category: _KeyCategory.digit),
+  _KeyDef(primary: '2', secondary: 'FORMAT', action: _KeyAction.digit2,
+      category: _KeyCategory.digit),
+  _KeyDef(primary: '3', secondary: 'RESET', action: _KeyAction.digit3,
+      category: _KeyCategory.digit),
+  _KeyDef(primary: '=', action: _KeyAction.enter, isCtrlKey: true,
+      category: _KeyCategory.operator_),
 ];
 
 // ROW 9 (4 keys): ROUND | LN | STO | RCL
 const List<_KeyDef> _row9 = [
-  _KeyDef(primary: 'ROUND', action: _KeyAction.unimplemented),
-  _KeyDef(
-      primary: 'LN', secondary: 'eˣ', action: _KeyAction.unimplemented),
-  _KeyDef(primary: 'STO', action: _KeyAction.unimplemented),
-  _KeyDef(
-      primary: 'RCL',
-      secondary: 'CLR WORK',
-      action: _KeyAction.unimplemented),
+  _KeyDef(primary: 'ROUND', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
+  _KeyDef(primary: 'LN', secondary: 'eˣ', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
+  _KeyDef(primary: 'STO', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
+  _KeyDef(primary: 'RCL', secondary: 'CLR WORK', action: _KeyAction.unimplemented,
+      category: _KeyCategory.function),
 ];
 
 // ROW 10 (4 keys): 0 | . | +/- | CE|C
 const List<_KeyDef> _row10 = [
-  _KeyDef(primary: '0', secondary: 'MEM', action: _KeyAction.digit0),
-  _KeyDef(primary: '.', secondary: 'FORMAT', action: _KeyAction.decimal),
-  _KeyDef(primary: '+/-', secondary: '±', action: _KeyAction.toggleSign),
-  _KeyDef(primary: 'CE|C', action: _KeyAction.ceC, isCtrlKey: true),
+  _KeyDef(primary: '0', secondary: 'MEM', action: _KeyAction.digit0,
+      category: _KeyCategory.digit),
+  _KeyDef(primary: '.', secondary: 'FORMAT', action: _KeyAction.decimal,
+      category: _KeyCategory.digit),
+  _KeyDef(primary: '+/-', secondary: '±', action: _KeyAction.toggleSign,
+      category: _KeyCategory.digit),
+  _KeyDef(primary: 'CE|C', action: _KeyAction.ceC, isCtrlKey: true,
+      category: _KeyCategory.clear),
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -500,12 +543,44 @@ class _FullKeyState extends ConsumerState<_FullKey> {
     final state = ref.watch(calculatorProvider);
     final key = widget.keyDef;
 
-    // ── Resolve color scheme ────────────────────────────────────────────────
-    Color borderColor = AppColors.glassBorder;
+    // ── LAYER 1: Category base colours (resting) ─────────────────────────────
+    Color borderColor;
     double borderWidth = 0.5;
-    Color bgColor = AppColors.glassOverlay;
-    Color primaryColor = AppColors.textPrimary;
+    Color bgColor;
+    Color primaryColor;
 
+    switch (key.category) {
+      case _KeyCategory.digit:
+        bgColor = AppColors.keyDigitBg;
+        borderColor = AppColors.keyDigitBorder;
+        primaryColor = AppColors.textPrimary;
+      case _KeyCategory.tvm:
+        bgColor = AppColors.keyTvmBg;
+        borderColor = AppColors.keyTvmBorder;
+        primaryColor = AppColors.textPrimary;
+      case _KeyCategory.operator_:
+        bgColor = AppColors.keyOperatorBg;
+        borderColor = AppColors.keyOperatorBorder;
+        primaryColor = AppColors.keyOperatorText;
+      case _KeyCategory.function:
+        bgColor = AppColors.keyFunctionBg;
+        borderColor = AppColors.keyFunctionBorder;
+        primaryColor = AppColors.keyFunctionText;
+      case _KeyCategory.control:
+        bgColor = AppColors.keyControlBg;
+        borderColor = AppColors.keyControlBorder;
+        primaryColor = AppColors.textPrimary;
+      case _KeyCategory.clear:
+        bgColor = AppColors.keyClearBg;
+        borderColor = AppColors.keyClearBorder;
+        primaryColor = AppColors.keyClearText;
+      case _KeyCategory.special2nd:
+        bgColor = AppColors.key2NdBg;
+        borderColor = AppColors.key2NdBorder;
+        primaryColor = AppColors.textPrimary;
+    }
+
+    // ── LAYER 2: Active-state overrides (wins over Layer 1) ───────────────
     final bool is2NdKey = key.action == _KeyAction.twoNd;
     final bool isCptKey = key.action == _KeyAction.cpt;
 
@@ -526,7 +601,7 @@ class _FullKeyState extends ConsumerState<_FullKey> {
       bgColor = AppColors.accent.withOpacity(0.10);
       primaryColor = AppColors.accent;
     } else if (key.isTvmKey && state.cptMode) {
-      // TVM key while CPT mode is active
+      // bgColor keeps amber TVM tint — harmonises with gold text
       borderColor = AppColors.accentSecondary.withOpacity(0.5);
       borderWidth = 1.0;
       primaryColor = AppColors.accentSecondary;
@@ -535,6 +610,7 @@ class _FullKeyState extends ConsumerState<_FullKey> {
         key.secondary != null &&
         key.secondary!.isNotEmpty) {
       // 2ND active and this key has a secondary — dim the primary label
+      // bg/border keep category tints so groups remain distinguishable
       primaryColor = AppColors.textPrimary.withOpacity(0.4);
     }
 

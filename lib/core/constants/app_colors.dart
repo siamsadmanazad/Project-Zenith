@@ -60,6 +60,34 @@ class AppColors {
   /// Glass shadow - 10% black
   static const Color glassShadow = Color(0x1A000000);
 
+  // ============ KEY CATEGORY TINTS ============
+  // Resting-state tints per key category. 5–8% opacity — only visible by contrast.
+  // ALL active-state overrides (2ND, CPT, TVM focused) supersede these.
+
+  static const Color keyDigitBg       = Color(0x14FFFFFF);
+  static const Color keyDigitBorder   = Color(0x29FFFFFF);
+
+  static const Color keyTvmBg         = Color(0x12FFBD39);
+  static const Color keyTvmBorder     = Color(0x22FFBD39);
+
+  static const Color keyOperatorBg     = Color(0x0D4A90E2);
+  static const Color keyOperatorBorder = Color(0x1A4A90E2);
+  static const Color keyOperatorText   = Color(0xFFD0D0DC);
+
+  static const Color keyFunctionBg     = Color(0x0FFFFFFF);
+  static const Color keyFunctionBorder = Color(0x20FFFFFF);
+  static const Color keyFunctionText   = Color(0xFFB8B8C8);
+
+  static const Color keyControlBg     = Color(0x0DFFBD39);
+  static const Color keyControlBorder = Color(0x1AFFBD39);
+
+  static const Color keyClearBg       = Color(0x0DE94560);
+  static const Color keyClearBorder   = Color(0x1AE94560);
+  static const Color keyClearText     = Color(0xFFE8C0C8);
+
+  static const Color key2NdBg         = Color(0x11FFBD39);
+  static const Color key2NdBorder     = Color(0x22FFBD39);
+
   // ============ GRADIENTS ============
 
   /// Accent gradient - For premium buttons
