@@ -34,12 +34,12 @@ class _ModeSegmentedControlState extends State<ModeSegmentedControl>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 350),
+      duration: const Duration(milliseconds: 260),
       value: widget.currentMode == CalculatorMode.keypad ? 0.0 : 1.0,
     );
     _slide = CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeInOutCubicEmphasized,
+      curve: Curves.easeOutCubic,
     );
   }
 

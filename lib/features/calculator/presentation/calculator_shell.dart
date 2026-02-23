@@ -33,8 +33,8 @@ class _CalculatorShellState extends ConsumerState<CalculatorShell> {
     ref.read(calculatorModeProvider.notifier).state = mode;
     _pageController.animateToPage(
       mode == CalculatorMode.keypad ? 0 : 1,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeInOutCubicEmphasized,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
     );
   }
 
@@ -60,6 +60,7 @@ class _CalculatorShellState extends ConsumerState<CalculatorShell> {
           Expanded(
             child: PageView(
               controller: _pageController,
+              physics: const ClampingScrollPhysics(),
               onPageChanged: (index) {
                 ref.read(calculatorModeProvider.notifier).state =
                     index == 0 ? CalculatorMode.keypad : CalculatorMode.form;

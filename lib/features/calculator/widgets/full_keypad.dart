@@ -287,24 +287,6 @@ class FullKeypad extends ConsumerWidget {
     final notifier = ref.read(calculatorProvider.notifier);
     final state = ref.read(calculatorProvider);
 
-    // Category-aware haptic feedback
-    switch (key.category) {
-      case _KeyCategory.digit:
-        HapticService.digit();
-      case _KeyCategory.tvm:
-        HapticService.tvm();
-      case _KeyCategory.operator_:
-        HapticService.operator_();
-      case _KeyCategory.function:
-        HapticService.function_();
-      case _KeyCategory.control:
-        HapticService.function_();
-      case _KeyCategory.clear:
-        HapticService.clear();
-      case _KeyCategory.special2nd:
-        HapticService.function_();
-    }
-
     // STO/RCL mode intercept — digits handled inside appendDigit,
     // non-digit cancels mode
     if ((state.stoMode || state.rclMode) &&
@@ -925,6 +907,18 @@ class _FullKey extends ConsumerStatefulWidget {
 class _FullKeyState extends ConsumerState<_FullKey> {
   bool _pressed = false;
 
+  void _haptic() {
+    switch (widget.keyDef.category) {
+      case _KeyCategory.digit:      HapticService.digit();
+      case _KeyCategory.tvm:        HapticService.tvm();
+      case _KeyCategory.operator_:  HapticService.operator_();
+      case _KeyCategory.function:   HapticService.function_();
+      case _KeyCategory.control:    HapticService.function_();
+      case _KeyCategory.clear:      HapticService.clear();
+      case _KeyCategory.special2nd: HapticService.function_();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(calculatorProvider);
@@ -1007,7 +1001,10 @@ class _FullKeyState extends ConsumerState<_FullKey> {
     final bool showDot = key.isTvmKey && _hasValue(state, key.primary);
 
     return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
+      onTapDown: (_) {
+        _haptic();
+        setState(() => _pressed = true);
+      },
       onTapUp: (_) {
         setState(() => _pressed = false);
         widget.onTap();
